@@ -24,11 +24,15 @@ export function toAzureBlobStorage<TArg>({
   eventEmitter,
 }: AzureBlobStoringOptions<TArg>): () => common.DatumStoringFactory<
   TArg,
-  Buffer
+  Buffer,
+  blob.BlobUploadCommonResponse
 > {
+  console.log("ONCE PER LIFETIME");// eslint-disable-line
   return () => {
+    console.log("ONCE PER PIPELINE");// eslint-disable-line
     const existingCount: { [blobURL: string]: number } = {};
     return (arg, recreateSignal) => {
+      console.log("MULTIPLE PER PIPELINE"); // eslint-disable-line
       const name = getBlobID(arg);
       existingCount[name] = name in existingCount ? existingCount[name] + 1 : 0;
       const clientInfo = blobClientFactory(name, existingCount[name], arg);
@@ -51,15 +55,20 @@ export function toAzureBlobStorage<TArg>({
         let error: unknown = undefined;
         let bytesUploaded = 0;
         try {
-          await blockBlobClient.uploadStream(readable, blockSize, undefined, {
-            onProgress: ({ loadedBytes }) => {
-              bytesUploaded = loadedBytes;
-              eventEmitter?.emit("uploadProgress", {
-                ...eventArg,
-                bytesUploaded: loadedBytes,
-              });
+          return await blockBlobClient.uploadStream(
+            readable,
+            blockSize,
+            undefined,
+            {
+              onProgress: ({ loadedBytes }) => {
+                bytesUploaded = loadedBytes;
+                eventEmitter?.emit("uploadProgress", {
+                  ...eventArg,
+                  bytesUploaded: loadedBytes,
+                });
+              },
             },
-          });
+          );
         } catch (e) {
           error = e;
           throw e;
