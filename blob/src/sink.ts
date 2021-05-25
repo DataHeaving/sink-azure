@@ -27,12 +27,9 @@ export function toAzureBlobStorage<TArg>({
   Buffer,
   blob.BlobUploadCommonResponse
 > {
-  console.log("ONCE PER LIFETIME");// eslint-disable-line
   return () => {
-    console.log("ONCE PER PIPELINE");// eslint-disable-line
     const existingCount: { [blobURL: string]: number } = {};
     return (arg, recreateSignal) => {
-      console.log("MULTIPLE PER PIPELINE"); // eslint-disable-line
       const name = getBlobID(arg);
       existingCount[name] = name in existingCount ? existingCount[name] + 1 : 0;
       const clientInfo = blobClientFactory(name, existingCount[name], arg);
