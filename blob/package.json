@@ -1,11 +1,12 @@
 {
   "name": "@data-heaving/sink-azure-blob",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "author": {
     "name": "Stanislav Muhametsin",
     "email": "346799+stazz@users.noreply.github.com",
     "url": "https://github.com/stazz"
   },
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/DataHeaving/sink-azure.git"
@@ -13,20 +14,16 @@
   "scripts": {
     "build": "npm run tsc && npm run lint",
     "tsc": "tsc --project tsconfig.json && tsc --project tsconfig.json --outDir ./dist/esm --module ES2020",
-    "prepublishOnly": "rm -rf dist && npm run build && npm run test",
+    "prepublishOnly": "rm -rf dist && npm run build && npm run test && npm run remove-test-files",
     "lint": "eslint ./src --ext .ts,.tsx",
     "watch": "tsc -w",
-    "prestart": "npm run build",
-    "run": "node dist/cjs",
-    "dev-run": "ts-node dist/cjs",
-    "test": "npm run run-test && npm run remove-test-files",
-    "run-test": "echo TODO TESTS",
+    "test": "echo TODO TESTS",
     "remove-test-files": "rm -rf dist/*/tests src/*/tests"
   },
   "dependencies": {
     "@azure/identity": "1.3.0",
     "@azure/storage-blob": "12.5.0",
-    "@data-heaving/common-azure": "0.9.0"
+    "@data-heaving/common-azure": "0.10.2"
   },
   "devDependencies": {
     "@types/node": "14.14.31",
@@ -36,7 +33,6 @@
     "eslint-config-prettier": "8.3.0",
     "eslint-plugin-prettier": "3.4.0",
     "prettier": "2.2.1",
-    "ts-node": "9.1.1",
     "typescript": "4.2.4"
   },
   "files": [
@@ -44,5 +40,6 @@
     "src/"
   ],
   "main": "./dist/cjs/index.js",
-  "module": "./dist/esm/index.js"
+  "module": "./dist/esm/index.js",
+  "types": "./dist/cjs/index.d.ts"
 }
