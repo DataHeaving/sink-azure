@@ -28,6 +28,7 @@ export function toAzureBlobStorage<TArg>({
   blob.BlobUploadCommonResponse
 > {
   return () => {
+    // TODO make test that existingCount does not persist between invocations of same pipeline
     const existingCount: { [blobURL: string]: number } = {};
     return (arg, recreateSignal) => {
       const name = getBlobID(arg);
