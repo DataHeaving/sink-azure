@@ -4,8 +4,9 @@ import * as common from "@data-heaving/common";
 import * as testSupport from "@data-heaving/common-test-support";
 import * as abi from "./interface";
 
+let port = 10000;
+
 abi.thisTest.beforeEach("Start Azurite Container", async (t) => {
-  const port = 10000;
   const containerName = "test-container";
   const {
     containerID,
@@ -16,6 +17,7 @@ abi.thisTest.beforeEach("Start Azurite Container", async (t) => {
     containerPorts: [
       {
         containerPort: port,
+        exposedPort: ++port, // We have to do this when GitHub action is running the tests via "real", non-Dockerized npm.
       },
     ],
     containerEnvironment: {},
