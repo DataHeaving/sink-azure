@@ -4,7 +4,7 @@ import * as spec from "../sink";
 import * as abi from "../tests-setup/interface";
 import { ExecutionContext } from "ava";
 
-abi.thisTest(
+abi.thisTest.serial(
   "Verify that blob storing works as intended in simple usecase",
   async (t) => {
     const { sinkFactory, getBlobSDKClient } = createSinkFactory(t);
@@ -25,59 +25,65 @@ abi.thisTest(
   },
 );
 
-abi.thisTest("Verify that error from blob service propagates", async (t) => {
-  const sink = spec.toAzureBlobStorage({
-    getBlobID: () => BLOB_ID,
-    blobClientFactory: () => ({
-      client: new storage.BlockBlobClient(
-        `${t.context.blobInfo.containerURL.replace(
-          t.context.blobInfo.containerName,
-          "non-existing-blob",
-        )}/${BLOB_ID}.txt`,
-        t.context.blobInfo.credential,
-      ),
-    }),
-  })()("Context", recreateSignalNotSupported);
-  sink.storing.processor(Buffer.from("Some data"));
-  sink.storing.end();
+abi.thisTest.serial(
+  "Verify that error from blob service propagates",
+  async (t) => {
+    const sink = spec.toAzureBlobStorage({
+      getBlobID: () => BLOB_ID,
+      blobClientFactory: () => ({
+        client: new storage.BlockBlobClient(
+          `${t.context.blobInfo.containerURL.replace(
+            t.context.blobInfo.containerName,
+            "non-existing-blob",
+          )}/${BLOB_ID}.txt`,
+          t.context.blobInfo.credential,
+        ),
+      }),
+    })()("Context", recreateSignalNotSupported);
+    sink.storing.processor(Buffer.from("Some data"));
+    sink.storing.end();
 
-  await t.throwsAsync(() => sink.promise!, {
-    instanceOf: storage.RestError,
-  });
-});
+    await t.throwsAsync(() => sink.promise!, {
+      instanceOf: storage.RestError,
+    });
+  },
+);
 
-abi.thisTest("Verify that splitting into multiple blobs works", async (t) => {
-  const { sinkFactory, getBlobSDKClient } = createSinkFactory(t, 1 / 1024);
-  let sink: ReturnType<typeof sinkFactory> | undefined = undefined;
-  const promises: Array<Promise<unknown>> = [];
-  const recreateSink = () => {
-    if (sink) {
-      sink.storing.end();
-      promises.push(sink.promise!);
-      sink = undefined;
-    }
-  };
-  const getCurrentSink = () => {
-    if (!sink) {
-      sink = sinkFactory("Context", recreateSink);
-    }
-    return sink;
-  };
-  const data1 = Buffer.from("This is first data");
-  getCurrentSink().storing.processor(data1, controlFlowUsageNotSupported);
-  const data2 = Buffer.from("This is second data");
-  getCurrentSink().storing.processor(data2, controlFlowUsageNotSupported);
-  recreateSink();
+abi.thisTest.serial(
+  "Verify that splitting into multiple blobs works",
+  async (t) => {
+    const { sinkFactory, getBlobSDKClient } = createSinkFactory(t, 1 / 1024);
+    let sink: ReturnType<typeof sinkFactory> | undefined = undefined;
+    const promises: Array<Promise<unknown>> = [];
+    const recreateSink = () => {
+      if (sink) {
+        sink.storing.end();
+        promises.push(sink.promise!);
+        sink = undefined;
+      }
+    };
+    const getCurrentSink = () => {
+      if (!sink) {
+        sink = sinkFactory("Context", recreateSink);
+      }
+      return sink;
+    };
+    const data1 = Buffer.from("This is first data");
+    getCurrentSink().storing.processor(data1, controlFlowUsageNotSupported);
+    const data2 = Buffer.from("This is second data");
+    getCurrentSink().storing.processor(data2, controlFlowUsageNotSupported);
+    recreateSink();
 
-  t.deepEqual(promises.length, 2);
-  await Promise.all(promises);
+    t.deepEqual(promises.length, 2);
+    await Promise.all(promises);
 
-  // Wait until metadata about uploaded blob syncs
-  await common.sleep(1000);
+    // Wait until metadata about uploaded blob syncs
+    await common.sleep(1000);
 
-  t.deepEqual(await getBlobSDKClient(0).downloadToBuffer(), data1);
-  t.deepEqual(await getBlobSDKClient(1).downloadToBuffer(), data2);
-});
+    t.deepEqual(await getBlobSDKClient(0).downloadToBuffer(), data1);
+    t.deepEqual(await getBlobSDKClient(1).downloadToBuffer(), data2);
+  },
+);
 
 const createSinkFactory = (
   t: ExecutionContext<abi.BlobSinkTestContext>,
