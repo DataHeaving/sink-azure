@@ -48,14 +48,14 @@ abi.thisTest.before("Start Azurite Container", async (t) => {
   }
 });
 
-abi.thisTest.beforeEach("Create container", async (t) => {
+abi.thisTest.beforeEach("Create storage container", async (t) => {
   const { containerURL, credential } = t.context.blobInfo;
   await new storage.ContainerClient(containerURL, credential).create({
     access: "container",
   });
 });
 
-abi.thisTest.afterEach("Delete container", async (t) => {
+abi.thisTest.afterEach("Delete storage container", async (t) => {
   const { containerURL, credential } = t.context.blobInfo;
   await new storage.ContainerClient(containerURL, credential).delete();
 });
