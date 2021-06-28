@@ -8,6 +8,7 @@ let port = 10000;
 
 abi.thisTest.beforeEach("Start Azurite Container", async (t) => {
   const containerName = "test-container";
+  const exposedPort = ++port; // We have to do this when GitHub action is running the tests via "real", non-Dockerized npm.
   const {
     containerID,
     containerHostName,
@@ -17,7 +18,7 @@ abi.thisTest.beforeEach("Start Azurite Container", async (t) => {
     containerPorts: [
       {
         containerPort: port,
-        exposedPort: ++port, // We have to do this when GitHub action is running the tests via "real", non-Dockerized npm.
+        exposedPort,
       },
     ],
     containerEnvironment: {},
@@ -25,7 +26,7 @@ abi.thisTest.beforeEach("Start Azurite Container", async (t) => {
   });
   t.context.containerID = containerID;
   const storageAccountName = "devstoreaccount1";
-  const containerURL = `http://${containerHostName}:${port}/${storageAccountName}/${containerName}`;
+  const containerURL = `http://${containerHostName}:${exposedPort}/${storageAccountName}/${containerName}`;
   const credential = new storage.StorageSharedKeyCredential(
     "devstoreaccount1",
     "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==",
