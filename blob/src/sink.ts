@@ -4,36 +4,36 @@ import * as common from "@data-heaving/common";
 import * as commonAzure from "@data-heaving/common-azure";
 import * as events from "./events";
 
-export interface AzureBlobStoringOptions<TArg> {
-  getBlobID: (arg: TArg) => string; // Doesn't need to be URL
+export interface AzureBlobStoringOptions<TContext> {
+  getBlobID: (context: TContext) => string; // Doesn't need to be URL
   blobClientFactory: (
     blobID: string,
     existingCount: number,
-    arg: TArg,
+    context: TContext,
   ) => {
     client: commonAzure.BlobClientOrInfo;
     maxSizeInKB?: number;
     blockSizeInKB?: number;
   };
-  eventEmitter?: events.VirtualBlobWriteEventEmitter<TArg>;
+  eventEmitter?: events.VirtualBlobWriteEventEmitter<TContext>;
 }
 
-export function toAzureBlobStorage<TArg>({
+export function toAzureBlobStorage<TContext>({
   getBlobID,
   blobClientFactory,
   eventEmitter,
-}: AzureBlobStoringOptions<TArg>): () => common.DatumStoringFactory<
-  TArg,
+}: AzureBlobStoringOptions<TContext>): () => common.DatumStoringFactory<
+  TContext,
   Buffer,
   blob.BlobUploadCommonResponse
 > {
   return () => {
     // TODO make test that existingCount does not persist between invocations of same pipeline
     const existingCount: { [blobURL: string]: number } = {};
-    return (arg, recreateSignal) => {
-      const name = getBlobID(arg);
+    return (context, recreateSignal) => {
+      const name = getBlobID(context);
       existingCount[name] = name in existingCount ? existingCount[name] + 1 : 0;
-      const clientInfo = blobClientFactory(name, existingCount[name], arg);
+      const clientInfo = blobClientFactory(name, existingCount[name], context);
       const maxSize = (clientInfo.maxSizeInKB || 0) * 1024;
       const blockSize = (clientInfo.blockSizeInKB || 1024) * 1024;
       const client = clientInfo.client;
@@ -41,9 +41,9 @@ export function toAzureBlobStorage<TArg>({
         client instanceof blob.BlockBlobClient
           ? client
           : new blob.BlockBlobClient(client.url, client.credential);
-      const eventArg: events.VirtualBlobWriteEvents<TArg>["uploadStart"] = {
+      const eventArg: events.VirtualBlobWriteEvents<TContext>["uploadStart"] = {
         blobPath: blockBlobClient.url,
-        creationArg: arg,
+        creationArg: context,
       };
       eventEmitter?.emit("uploadStart", eventArg);
       const readable = new stream.PassThrough({
@@ -71,7 +71,7 @@ export function toAzureBlobStorage<TArg>({
           error = e;
           throw e;
         } finally {
-          const endArg: events.VirtualBlobWriteEvents<TArg>["uploadEnd"] = {
+          const endArg: events.VirtualBlobWriteEvents<TContext>["uploadEnd"] = {
             ...eventArg,
             bytesUploaded,
           };
@@ -100,7 +100,7 @@ export function toAzureBlobStorage<TArg>({
             readable.end();
           },
         },
-        promises: [promise],
+        promise,
       };
     };
   };
