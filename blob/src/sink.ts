@@ -43,7 +43,7 @@ export function toAzureBlobStorage<TContext>({
           : new blob.BlockBlobClient(client.url, client.credential);
       const eventArg: events.VirtualBlobWriteEvents<TContext>["uploadStart"] = {
         blobPath: blockBlobClient.url,
-        creationArg: context,
+        context,
       };
       eventEmitter?.emit("uploadStart", eventArg);
       const readable = new stream.PassThrough({
@@ -76,7 +76,7 @@ export function toAzureBlobStorage<TContext>({
             bytesUploaded,
           };
           if (error) {
-            endArg.error = error as Error;
+            endArg.error = error;
           }
           eventEmitter?.emit("uploadEnd", endArg);
         }

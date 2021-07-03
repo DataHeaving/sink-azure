@@ -1,26 +1,59 @@
 import * as common from "@data-heaving/common";
 import * as storage from "@azure/storage-blob";
-import * as spec from "../sink";
 import * as abi from "../tests-setup/interface";
 import { ExecutionContext } from "ava";
+import * as spec from "../sink";
+import * as events from "../events";
 
 abi.thisTest.serial(
   "Verify that blob storing works as intended in simple usecase",
   async (t) => {
-    const { sinkFactory, getBlobSDKClient } = createSinkFactory(t);
+    const { sinkFactory, getBlobSDKClient, eventTracker } = createSinkFactory(
+      t,
+    );
+    const context = "Context";
     const { storing, promise } = sinkFactory(
-      "Context",
+      context,
       recreateSignalNotSupported,
     );
     const data = Buffer.from("This is test");
     storing.processor(data, controlFlowUsageNotSupported);
     storing.end();
 
-    await promise!;
+    await promise;
 
-    // Wait until metadata about uploaded blob syncs
-    await common.sleep(1000);
-
+    const blobPath = getBlobSDKClient(0).url;
+    t.deepEqual(eventTracker, {
+      uploadStart: [
+        {
+          eventIndex: 0,
+          eventArg: {
+            context,
+            blobPath,
+          },
+        },
+      ],
+      uploadProgress: [
+        {
+          eventIndex: 1,
+          eventArg: {
+            context,
+            blobPath,
+            bytesUploaded: data.byteLength,
+          },
+        },
+      ],
+      uploadEnd: [
+        {
+          eventIndex: 2,
+          eventArg: {
+            context,
+            blobPath,
+            bytesUploaded: data.byteLength,
+          },
+        },
+      ],
+    });
     t.deepEqual(await getBlobSDKClient(0).downloadToBuffer(), data);
   },
 );
@@ -34,7 +67,7 @@ abi.thisTest.serial(
         client: new storage.BlockBlobClient(
           `${t.context.blobInfo.containerURL.replace(
             t.context.blobInfo.containerName,
-            "non-existing-blob",
+            "non-existing-container",
           )}/${BLOB_ID}.txt`,
           t.context.blobInfo.credential,
         ),
@@ -43,7 +76,7 @@ abi.thisTest.serial(
     sink.storing.processor(Buffer.from("Some data"));
     sink.storing.end();
 
-    await t.throwsAsync(() => sink.promise!, {
+    await t.throwsAsync(async () => await sink.promise, {
       instanceOf: storage.RestError,
     });
   },
@@ -52,19 +85,23 @@ abi.thisTest.serial(
 abi.thisTest.serial(
   "Verify that splitting into multiple blobs works",
   async (t) => {
-    const { sinkFactory, getBlobSDKClient } = createSinkFactory(t, 1 / 1024);
+    const { sinkFactory, getBlobSDKClient, eventTracker } = createSinkFactory(
+      t,
+      1 / 1024,
+    );
     let sink: ReturnType<typeof sinkFactory> | undefined = undefined;
-    const promises: Array<Promise<unknown>> = [];
+    const promises: Array<Promise<unknown> | undefined> = [];
     const recreateSink = () => {
       if (sink) {
         sink.storing.end();
-        promises.push(sink.promise!);
+        promises.push(sink.promise);
         sink = undefined;
       }
     };
+    const context = "Context";
     const getCurrentSink = () => {
       if (!sink) {
-        sink = sinkFactory("Context", recreateSink);
+        sink = sinkFactory(context, recreateSink);
       }
       return sink;
     };
@@ -77,11 +114,65 @@ abi.thisTest.serial(
     t.deepEqual(promises.length, 2);
     await Promise.all(promises);
 
-    // Wait until metadata about uploaded blob syncs
-    await common.sleep(1000);
+    const firstClient = getBlobSDKClient(0);
+    const secondClient = getBlobSDKClient(1);
 
-    t.deepEqual(await getBlobSDKClient(0).downloadToBuffer(), data1);
-    t.deepEqual(await getBlobSDKClient(1).downloadToBuffer(), data2);
+    t.deepEqual(eventTracker, {
+      uploadStart: [
+        {
+          eventIndex: 0,
+          eventArg: {
+            context,
+            blobPath: firstClient.url,
+          },
+        },
+        {
+          eventIndex: 1,
+          eventArg: {
+            context,
+            blobPath: secondClient.url,
+          },
+        },
+      ],
+      uploadProgress: [
+        {
+          eventIndex: 2,
+          eventArg: {
+            context,
+            blobPath: firstClient.url,
+            bytesUploaded: data1.byteLength,
+          },
+        },
+        {
+          eventIndex: eventTracker.uploadProgress[1].eventIndex, // The order is indetermenistic because of IO
+          eventArg: {
+            context,
+            blobPath: secondClient.url,
+            bytesUploaded: data2.byteLength,
+          },
+        },
+      ],
+      uploadEnd: [
+        {
+          eventIndex: eventTracker.uploadEnd[0].eventIndex, // The order is indetermenistic because of IO
+          eventArg: {
+            context,
+            blobPath: firstClient.url,
+            bytesUploaded: data1.byteLength,
+          },
+        },
+        {
+          eventIndex: eventTracker.uploadEnd[1].eventIndex, // The order is indetermenistic because of IO
+          eventArg: {
+            context,
+            blobPath: secondClient.url,
+            bytesUploaded: data2.byteLength,
+          },
+        },
+      ],
+    });
+    t.deepEqual(await firstClient.downloadToBuffer(), data1);
+    t.deepEqual(await secondClient.downloadToBuffer(), data2);
   },
 );
 
@@ -101,13 +192,16 @@ const createSinkFactory = (
       maxSizeInKB,
     });
   }
+  const { eventEmitter, eventTracker } = createEventEmitterAndRecorder();
   const sinkOptions: spec.AzureBlobStoringOptions<unknown> = {
     getBlobID: () => BLOB_ID,
     blobClientFactory,
+    eventEmitter,
   };
   return {
     sinkFactory: spec.toAzureBlobStorage(sinkOptions)(),
     getBlobSDKClient,
+    eventTracker,
   };
 };
 
@@ -125,3 +219,34 @@ const recreateSignalNotSupported = () => {
 };
 
 const BLOB_ID = "test";
+
+const createEventEmitterAndRecorder = () => {
+  const eventBuilder = events.createEventEmitterBuilder<string>();
+  let eventIndex = 0;
+  const eventTracker: Record<
+    keyof events.VirtualBlobWriteEvents<string>,
+    Array<{
+      eventIndex: number;
+      eventArg: events.VirtualBlobWriteEvents<string>[keyof events.VirtualBlobWriteEvents<string>];
+    }>
+  > = {
+    uploadStart: [],
+    uploadProgress: [],
+    uploadEnd: [],
+  };
+  for (const evtName of Object.keys(eventTracker)) {
+    const eventName = evtName as keyof events.VirtualBlobWriteEvents<string>;
+    eventBuilder.addEventListener(eventName, (eventArg) => {
+      eventTracker[eventName].push({
+        eventIndex,
+        eventArg,
+      });
+      ++eventIndex;
+    });
+  }
+
+  return {
+    eventEmitter: eventBuilder.createEventEmitter(),
+    eventTracker,
+  };
+};

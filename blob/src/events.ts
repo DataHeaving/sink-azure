@@ -1,41 +1,45 @@
-import * as utils from "@data-heaving/common";
+import * as common from "@data-heaving/common";
 
 // This is virtual interface - no instances implementing this are ever created
-export interface VirtualBlobWriteEvents<TArg> {
+export interface VirtualBlobWriteEvents<TContext> {
   uploadStart: {
-    creationArg: TArg;
+    context: TContext;
     blobPath: string;
   };
-  uploadProgress: VirtualBlobWriteEvents<TArg>["uploadStart"] & {
+  uploadProgress: VirtualBlobWriteEvents<TContext>["uploadStart"] & {
     bytesUploaded: number;
   };
-  uploadEnd: VirtualBlobWriteEvents<TArg>["uploadProgress"] & {
-    error?: Error;
+  uploadEnd: VirtualBlobWriteEvents<TContext>["uploadProgress"] & {
+    error?: unknown;
   };
 }
 
-export type VirtualBlobWriteEventEmitter<TArg> = utils.EventEmitter<
+export type VirtualBlobWriteEventEmitter<TArg> = common.EventEmitter<
   VirtualBlobWriteEvents<TArg>
 >;
 
-export const createEventEmitterBuilder = <TArg>() =>
-  new utils.EventEmitterBuilder<VirtualBlobWriteEvents<TArg>>();
+export const createEventEmitterBuilder = <TContext>() =>
+  new common.EventEmitterBuilder<VirtualBlobWriteEvents<TContext>>();
 
-export const consoleLoggingEventEmitterBuilder = <TArg>(
-  getArgString: (arg: TArg) => string,
-  logMessagePrefix?: Parameters<typeof utils.createConsoleLogger>[0],
-  builder?: utils.EventEmitterBuilder<VirtualBlobWriteEvents<TArg>>,
+export const consoleLoggingEventEmitterBuilder = <TContext>(
+  getContextDescription: (arg: TContext) => string,
+  logMessagePrefix?: Parameters<typeof common.createConsoleLogger>[0],
+  builder?: common.EventEmitterBuilder<VirtualBlobWriteEvents<TContext>>,
+  consoleAbstraction?: common.ConsoleAbstraction,
   printProgress?: boolean,
 ) => {
   if (!builder) {
     builder = createEventEmitterBuilder();
   }
 
-  const logger = utils.createConsoleLogger(logMessagePrefix);
+  const logger = common.createConsoleLogger(
+    logMessagePrefix,
+    consoleAbstraction,
+  );
 
   builder.addEventListener("uploadStart", (arg) =>
     logger(
-      `Initiating upload of ${getArgString(arg.creationArg)} to ${
+      `Initiating upload of ${getContextDescription(arg.context)} to ${
         arg.blobPath
       }.`,
     ),
@@ -43,7 +47,7 @@ export const consoleLoggingEventEmitterBuilder = <TArg>(
   if (printProgress === true) {
     builder.addEventListener("uploadProgress", (arg) =>
       logger(
-        `For ${getArgString(arg.creationArg)} and path ${
+        `For ${getContextDescription(arg.context)} and path ${
           arg.blobPath
         } uploaded ${arg.bytesUploaded} bytes.`,
       ),

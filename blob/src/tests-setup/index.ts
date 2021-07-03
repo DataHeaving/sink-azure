@@ -55,7 +55,7 @@ abi.thisTest.beforeEach("Create storage container", async (t) => {
   });
 });
 
-abi.thisTest.afterEach("Delete storage container", async (t) => {
+abi.thisTest.afterEach.always("Delete storage container", async (t) => {
   const { containerURL, credential } = t.context.blobInfo;
   await new storage.ContainerClient(containerURL, credential).delete();
 });
