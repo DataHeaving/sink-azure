@@ -1,7 +1,7 @@
 import * as blob from "@azure/storage-blob";
 import * as stream from "stream";
 import * as common from "@data-heaving/common";
-import * as commonAzure from "@data-heaving/common-azure";
+import * as commonAzure from "@data-heaving/azure-storage-blob";
 import * as events from "./events";
 
 export interface AzureBlobStoringOptions<TContext> {
@@ -11,7 +11,7 @@ export interface AzureBlobStoringOptions<TContext> {
     existingCount: number,
     context: TContext,
   ) => {
-    client: commonAzure.BlobClientOrInfo;
+    client: commonAzure.BlobClientOrInfo<blob.BlobClient>;
     maxSizeInKB?: number;
     blockSizeInKB?: number;
   };

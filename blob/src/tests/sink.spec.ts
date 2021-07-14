@@ -136,19 +136,27 @@ abi.thisTest.serial(
       ],
       uploadProgress: [
         {
-          eventIndex: 2,
+          eventIndex: eventTracker.uploadProgress[0].eventIndex, // The order is indetermenistic because of IO,
           eventArg: {
             context,
-            blobPath: firstClient.url,
-            bytesUploaded: data1.byteLength,
+            blobPath: eventTracker.uploadProgress[0].eventArg.blobPath,
+            bytesUploaded: (eventTracker.uploadProgress[0].eventArg.blobPath ===
+            firstClient.url
+              ? data1
+              : data2
+            ).byteLength,
           },
         },
         {
           eventIndex: eventTracker.uploadProgress[1].eventIndex, // The order is indetermenistic because of IO
           eventArg: {
             context,
-            blobPath: secondClient.url,
-            bytesUploaded: data2.byteLength,
+            blobPath: eventTracker.uploadProgress[1].eventArg.blobPath,
+            bytesUploaded: (eventTracker.uploadProgress[1].eventArg.blobPath ===
+            firstClient.url
+              ? data1
+              : data2
+            ).byteLength,
           },
         },
       ],
@@ -157,16 +165,24 @@ abi.thisTest.serial(
           eventIndex: eventTracker.uploadEnd[0].eventIndex, // The order is indetermenistic because of IO
           eventArg: {
             context,
-            blobPath: firstClient.url,
-            bytesUploaded: data1.byteLength,
+            blobPath: eventTracker.uploadEnd[0].eventArg.blobPath,
+            bytesUploaded: (eventTracker.uploadEnd[0].eventArg.blobPath ===
+            firstClient.url
+              ? data1
+              : data2
+            ).byteLength,
           },
         },
         {
           eventIndex: eventTracker.uploadEnd[1].eventIndex, // The order is indetermenistic because of IO
           eventArg: {
             context,
-            blobPath: secondClient.url,
-            bytesUploaded: data2.byteLength,
+            blobPath: eventTracker.uploadEnd[1].eventArg.blobPath,
+            bytesUploaded: (eventTracker.uploadEnd[1].eventArg.blobPath ===
+            firstClient.url
+              ? data1
+              : data2
+            ).byteLength,
           },
         },
       ],
